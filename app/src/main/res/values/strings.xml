@@ -11,6 +11,10 @@
     <string name="action_change_password">Change password</string>
     <string name="action_forgot_password">Forgot password</string>
     <string name="action_clear_preferences">Clear preferences &amp; sign out</string>
+    <string name="change_password_title">Change password</string>
+    <string name="change_password_subtitle">Enter your current password and a new one to update your account.</string>
+    <string name="forgot_password_title">Reset your password</string>
+    <string name="forgot_password_subtitle">Generate a temporary password for your account.</string>
     <string name="persistence_hint">Usernames and passwords are stored in the Room database. Enable &quot;Remember me&quot; to save the most recent login in SharedPreferences.</string>
     <string name="login_success">Login successful</string>
     <string name="login_failed">Incorrect username or password</string>
@@ -20,6 +24,7 @@
     <string name="change_password_success">Password updated successfully</string>
     <string name="change_password_invalid_current">Current password is incorrect</string>
     <string name="forgot_password_success">Temporary password generated: %1$s</string>
+    <string name="forgot_password_generated">Temporary password created</string>
     <string name="user_not_found">User not found</string>
     <string name="prefs_cleared">SharedPreferences cleared</string>
     <string name="welcome_back">Welcome back, %1$s! Last login: %2$s</string>
