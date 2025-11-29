@@ -22,7 +22,6 @@ import com.google.android.material.textfield.TextInputLayout;
 
 import java.text.DateFormat;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,10 +35,11 @@ public class MainActivity extends AppCompatActivity {
 
     private TextInputLayout usernameLayout;
     private TextInputLayout passwordLayout;
+    private TextInputLayout newPasswordLayout;
     private TextInputEditText etUsername;
     private TextInputEditText etPassword;
+    private TextInputEditText etNewPassword;
     private CheckBox cbRemember;
-    private TextView tvStorageSummary;
     private TextView persistenceInfo;
 
     private SharedPreferences preferences;
@@ -62,24 +62,28 @@ public class MainActivity extends AppCompatActivity {
 
         setupViews();
         restoreFromPreferences();
-        refreshStorageSummary();
     }
 
     private void setupViews() {
         usernameLayout = findViewById(R.id.usernameLayout);
         passwordLayout = findViewById(R.id.passwordLayout);
+        newPasswordLayout = findViewById(R.id.newPasswordLayout);
         etUsername = findViewById(R.id.etUsername);
         etPassword = findViewById(R.id.etPassword);
+        etNewPassword = findViewById(R.id.etNewPassword);
         cbRemember = findViewById(R.id.cbRemember);
-        tvStorageSummary = findViewById(R.id.tvStorageSummary);
         persistenceInfo = findViewById(R.id.persistenceInfo);
 
         MaterialButton btnLogin = findViewById(R.id.btnLogin);
         MaterialButton btnRegister = findViewById(R.id.btnRegister);
+        MaterialButton btnChangePassword = findViewById(R.id.btnChangePassword);
+        MaterialButton btnForgotPassword = findViewById(R.id.btnForgotPassword);
         MaterialButton btnClearPrefs = findViewById(R.id.btnClearPrefs);
 
         btnLogin.setOnClickListener(v -> handleLogin());
         btnRegister.setOnClickListener(v -> handleRegister());
+        btnChangePassword.setOnClickListener(v -> handleChangePassword());
+        btnForgotPassword.setOnClickListener(v -> handleForgotPassword());
         btnClearPrefs.setOnClickListener(v -> clearPreferences());
     }
 
@@ -98,7 +102,6 @@ public class MainActivity extends AppCompatActivity {
                 if (user != null && password.equals(user.getPassword())) {
                     savePreferences(username, cbRemember.isChecked());
                     Toast.makeText(this, R.string.login_success, Toast.LENGTH_SHORT).show();
-                    refreshStorageSummary();
                 } else {
                     Toast.makeText(this, R.string.login_failed, Toast.LENGTH_SHORT).show();
                 }
@@ -130,7 +133,61 @@ public class MainActivity extends AppCompatActivity {
                 savePreferences(username, true);
                 cbRemember.setChecked(true);
                 Toast.makeText(this, R.string.register_success, Toast.LENGTH_SHORT).show();
-                refreshStorageSummary();
+            });
+        });
+    }
+
+    private void handleChangePassword() {
+        clearErrors();
+        final String username = getText(etUsername);
+        final String currentPassword = getText(etPassword);
+        final String newPassword = getText(etNewPassword);
+
+        if (!isChangePasswordValid(username, currentPassword, newPassword)) {
+            return;
+        }
+
+        executor.execute(() -> {
+            User user = userDao.findByUsername(username);
+            if (user == null) {
+                runOnUiThread(() -> Toast.makeText(this, R.string.user_not_found, Toast.LENGTH_SHORT).show());
+                return;
+            }
+            if (!currentPassword.equals(user.getPassword())) {
+                runOnUiThread(() -> Toast.makeText(this, R.string.change_password_invalid_current, Toast.LENGTH_SHORT).show());
+                return;
+            }
+
+            userDao.updatePassword(username, newPassword);
+            runOnUiThread(() -> {
+                Toast.makeText(this, R.string.change_password_success, Toast.LENGTH_SHORT).show();
+                etPassword.setText(newPassword);
+                etNewPassword.setText("");
+            });
+        });
+    }
+
+    private void handleForgotPassword() {
+        clearErrors();
+        final String username = getText(etUsername);
+
+        if (TextUtils.isEmpty(username)) {
+            usernameLayout.setError(getString(R.string.fields_required));
+            return;
+        }
+
+        executor.execute(() -> {
+            User user = userDao.findByUsername(username);
+            if (user == null) {
+                runOnUiThread(() -> Toast.makeText(this, R.string.user_not_found, Toast.LENGTH_SHORT).show());
+                return;
+            }
+
+            String temporaryPassword = generateTemporaryPassword();
+            userDao.updatePassword(username, temporaryPassword);
+            runOnUiThread(() -> {
+                etPassword.setText(temporaryPassword);
+                Toast.makeText(this, getString(R.string.forgot_password_success, temporaryPassword), Toast.LENGTH_LONG).show();
             });
         });
     }
@@ -140,7 +197,6 @@ public class MainActivity extends AppCompatActivity {
         cbRemember.setChecked(false);
         persistenceInfo.setText(R.string.first_login_hint);
         Toast.makeText(this, R.string.prefs_cleared, Toast.LENGTH_SHORT).show();
-        refreshStorageSummary();
     }
 
     private void restoreFromPreferences() {
@@ -172,33 +228,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void refreshStorageSummary() {
-        executor.execute(() -> {
-            int userCount = userDao.getUserCount();
-            List<String> usernames = userDao.getAllUsernames();
-            boolean remember = preferences.getBoolean(KEY_REMEMBER, false);
-            String lastUser = preferences.getString(KEY_LAST_USER, "");
-            String lastTime = preferences.getString(KEY_LAST_LOGIN_TIME, getString(R.string.first_login_hint));
-
-            StringBuilder builder = new StringBuilder();
-            builder.append(getString(R.string.storage_summary)).append("\n\n")
-                    .append(getString(R.string.storage_room_count, userCount));
-            if (!usernames.isEmpty()) {
-                builder.append("\n")
-                        .append(getString(R.string.storage_recent_accounts, TextUtils.join(", ", usernames)));
-            }
-            String rememberState = getString(remember ? R.string.remember_enabled : R.string.remember_disabled);
-            builder.append("\n")
-                    .append(getString(R.string.storage_remember_me_state, rememberState));
-            if (remember) {
-                builder.append("\n")
-                        .append(getString(R.string.storage_last_login, lastUser, lastTime));
-            }
-
-            runOnUiThread(() -> tvStorageSummary.setText(builder.toString()));
-        });
-    }
-
     private boolean isInputValid(String username, String password) {
         boolean valid = true;
         if (TextUtils.isEmpty(username)) {
@@ -212,13 +241,36 @@ public class MainActivity extends AppCompatActivity {
         return valid;
     }
 
+    private boolean isChangePasswordValid(String username, String currentPassword, String newPassword) {
+        boolean valid = true;
+        if (TextUtils.isEmpty(username)) {
+            usernameLayout.setError(getString(R.string.fields_required));
+            valid = false;
+        }
+        if (TextUtils.isEmpty(currentPassword)) {
+            passwordLayout.setError(getString(R.string.fields_required));
+            valid = false;
+        }
+        if (TextUtils.isEmpty(newPassword) || newPassword.length() < 4) {
+            newPasswordLayout.setError(getString(R.string.fields_required));
+            valid = false;
+        }
+        return valid;
+    }
+
     private void clearErrors() {
         usernameLayout.setError(null);
         passwordLayout.setError(null);
+        newPasswordLayout.setError(null);
     }
 
     private String getText(TextInputEditText editText) {
         return editText.getText() != null ? editText.getText().toString().trim() : "";
+    }
+
+    private String generateTemporaryPassword() {
+        int random = 100000 + (int) (Math.random() * 900000);
+        return String.valueOf(random);
     }
 
     @Override
