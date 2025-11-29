@@ -1,5 +1,6 @@
 package com.example.login;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -35,10 +36,8 @@ public class MainActivity extends AppCompatActivity {
 
     private TextInputLayout usernameLayout;
     private TextInputLayout passwordLayout;
-    private TextInputLayout newPasswordLayout;
     private TextInputEditText etUsername;
     private TextInputEditText etPassword;
-    private TextInputEditText etNewPassword;
     private CheckBox cbRemember;
     private TextView persistenceInfo;
 
@@ -67,10 +66,8 @@ public class MainActivity extends AppCompatActivity {
     private void setupViews() {
         usernameLayout = findViewById(R.id.usernameLayout);
         passwordLayout = findViewById(R.id.passwordLayout);
-        newPasswordLayout = findViewById(R.id.newPasswordLayout);
         etUsername = findViewById(R.id.etUsername);
         etPassword = findViewById(R.id.etPassword);
-        etNewPassword = findViewById(R.id.etNewPassword);
         cbRemember = findViewById(R.id.cbRemember);
         persistenceInfo = findViewById(R.id.persistenceInfo);
 
@@ -82,8 +79,8 @@ public class MainActivity extends AppCompatActivity {
 
         btnLogin.setOnClickListener(v -> handleLogin());
         btnRegister.setOnClickListener(v -> handleRegister());
-        btnChangePassword.setOnClickListener(v -> handleChangePassword());
-        btnForgotPassword.setOnClickListener(v -> handleForgotPassword());
+        btnChangePassword.setOnClickListener(v -> startActivity(new Intent(this, ChangePasswordActivity.class)));
+        btnForgotPassword.setOnClickListener(v -> startActivity(new Intent(this, ForgotPasswordActivity.class)));
         btnClearPrefs.setOnClickListener(v -> clearPreferences());
     }
 
@@ -137,61 +134,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void handleChangePassword() {
-        clearErrors();
-        final String username = getText(etUsername);
-        final String currentPassword = getText(etPassword);
-        final String newPassword = getText(etNewPassword);
-
-        if (!isChangePasswordValid(username, currentPassword, newPassword)) {
-            return;
-        }
-
-        executor.execute(() -> {
-            User user = userDao.findByUsername(username);
-            if (user == null) {
-                runOnUiThread(() -> Toast.makeText(this, R.string.user_not_found, Toast.LENGTH_SHORT).show());
-                return;
-            }
-            if (!currentPassword.equals(user.getPassword())) {
-                runOnUiThread(() -> Toast.makeText(this, R.string.change_password_invalid_current, Toast.LENGTH_SHORT).show());
-                return;
-            }
-
-            userDao.updatePassword(username, newPassword);
-            runOnUiThread(() -> {
-                Toast.makeText(this, R.string.change_password_success, Toast.LENGTH_SHORT).show();
-                etPassword.setText(newPassword);
-                etNewPassword.setText("");
-            });
-        });
-    }
-
-    private void handleForgotPassword() {
-        clearErrors();
-        final String username = getText(etUsername);
-
-        if (TextUtils.isEmpty(username)) {
-            usernameLayout.setError(getString(R.string.fields_required));
-            return;
-        }
-
-        executor.execute(() -> {
-            User user = userDao.findByUsername(username);
-            if (user == null) {
-                runOnUiThread(() -> Toast.makeText(this, R.string.user_not_found, Toast.LENGTH_SHORT).show());
-                return;
-            }
-
-            String temporaryPassword = generateTemporaryPassword();
-            userDao.updatePassword(username, temporaryPassword);
-            runOnUiThread(() -> {
-                etPassword.setText(temporaryPassword);
-                Toast.makeText(this, getString(R.string.forgot_password_success, temporaryPassword), Toast.LENGTH_LONG).show();
-            });
-        });
-    }
-
     private void clearPreferences() {
         preferences.edit().clear().apply();
         cbRemember.setChecked(false);
@@ -241,36 +183,13 @@ public class MainActivity extends AppCompatActivity {
         return valid;
     }
 
-    private boolean isChangePasswordValid(String username, String currentPassword, String newPassword) {
-        boolean valid = true;
-        if (TextUtils.isEmpty(username)) {
-            usernameLayout.setError(getString(R.string.fields_required));
-            valid = false;
-        }
-        if (TextUtils.isEmpty(currentPassword)) {
-            passwordLayout.setError(getString(R.string.fields_required));
-            valid = false;
-        }
-        if (TextUtils.isEmpty(newPassword) || newPassword.length() < 4) {
-            newPasswordLayout.setError(getString(R.string.fields_required));
-            valid = false;
-        }
-        return valid;
-    }
-
     private void clearErrors() {
         usernameLayout.setError(null);
         passwordLayout.setError(null);
-        newPasswordLayout.setError(null);
     }
 
     private String getText(TextInputEditText editText) {
         return editText.getText() != null ? editText.getText().toString().trim() : "";
-    }
-
-    private String generateTemporaryPassword() {
-        int random = 100000 + (int) (Math.random() * 900000);
-        return String.valueOf(random);
     }
 
     @Override
