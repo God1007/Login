@@ -182,14 +182,17 @@ public class MainActivity extends AppCompatActivity {
 
             StringBuilder builder = new StringBuilder();
             builder.append(getString(R.string.storage_summary)).append("\n\n")
-                    .append("Room 中保存的账户数量：").append(userCount);
+                    .append(getString(R.string.storage_room_count, userCount));
             if (!usernames.isEmpty()) {
-                builder.append("\n最近的账户：").append(TextUtils.join(", ", usernames));
+                builder.append("\n")
+                        .append(getString(R.string.storage_recent_accounts, TextUtils.join(", ", usernames)));
             }
-            builder.append("\nSharedPreferences 记住我：").append(remember ? "已开启" : "未开启");
+            String rememberState = getString(remember ? R.string.remember_enabled : R.string.remember_disabled);
+            builder.append("\n")
+                    .append(getString(R.string.storage_remember_me_state, rememberState));
             if (remember) {
-                builder.append("\n最近登录用户：").append(lastUser)
-                        .append("（").append(lastTime).append("）");
+                builder.append("\n")
+                        .append(getString(R.string.storage_last_login, lastUser, lastTime));
             }
 
             runOnUiThread(() -> tvStorageSummary.setText(builder.toString()));
